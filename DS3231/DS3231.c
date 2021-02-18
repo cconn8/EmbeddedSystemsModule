@@ -9,7 +9,7 @@
  */
 
 #include<stdio.h>
-#include<stdio.h>
+#include<unistd.h>
 #include<fcntl.h>
 #include<sys/ioctl.h>
 #include<linux/i2c.h>
@@ -23,7 +23,7 @@ int main(){
    int file;
 
    printf("Starting the DS3231 test application\n");
-   if((file=open("/dev/i2c-2", O_RDWR)) < 0){
+   if((file=open("/dev/i2c-1", O_RDWR)) < 0){
       perror("failed to open the bus\n");
       return 1;
    }
