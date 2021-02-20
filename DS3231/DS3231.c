@@ -28,17 +28,30 @@ int main(){
       return 1;
    }
 
-   if(ioctl(file, I2C_SLAVE, 0x68) < 0){
+   if(ioctl(file, I2C_SLAVE, 0x68) < 0){   //0x69 adds write bit to end (01101001)
       perror("Failed to connect to the sensor\n");
       return 1;
    }
 
-   char writeBuffer[1] = {0x00};
+	char writeBuffer[1] = {0x00}; //initialise the first register
 
    if(write(file, writeBuffer, 1)!=1){
       perror("Failed to reset the read address\n");
       return 1;
    }
+
+	if(ioctl(file, I2C_SLAVE, 0x69)<0){  //0x69 should set  write bit (01101001)
+		perror("Failed to set write address\n");
+		return 1;
+	}
+
+	char hourBuffer[2] = {0x22};  //sets index 2 (0x02) to 22
+
+if(write(file, hourBuffer, 1)!=1){
+	perror("Failed to write hour register\n");
+	return 1;
+}
+
    char buf[BUFFER_SIZE];
 
    if(read(file, buf, BUFFER_SIZE)!=BUFFER_SIZE){
@@ -46,8 +59,11 @@ int main(){
        return 1;
     }
 
-    printf("The RTC time is %02d:%02d:%02d\n", bcdToDec(buf[2]), bcdToDec(buf[1]), bcdToDec(buf[0]));
-    close(file);
-    
-    return 0;
- }
+	printf("The RTC time is %02d:%02d:%02d\n", bcdToDec(buf[2]), bcdToDec(buf[1]), bcdToDec(buf[0]));
+//	printf("The bcd value is %02d\n",buf[0x11]);
+
+	close(file);
+
+	return 0;
+}
+
