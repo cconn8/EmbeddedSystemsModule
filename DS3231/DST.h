@@ -18,15 +18,21 @@ class DST {
 		int sec;
 		int min;
 		int hour;
+		int day;
+		int date;
+		int month;
+		int year;
 		int BUSNumber;
-		int  I2CAddress;
+		char I2CAddress;
 		char buffer[I2C_LENGTH];
 
 	public:
-		DST(int i2cBUS, int deviceAddress);
+		DST(int i2cBUS, char deviceAddress);
 
 		int bcdToDec(char b);
-		virtual int getTime();
+		virtual int getTimeDate();
+		virtual int setTimeDate(int hr, int min, int sec ); //int day, int date, int year
+		virtual char decToBcd(int val);
 		virtual ~DST();
 };
 
