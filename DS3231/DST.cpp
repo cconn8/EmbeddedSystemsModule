@@ -83,9 +83,9 @@ int DST::getTime() {
 			cout<<"Failure to read byte stream "<<endl;
 		}
 
-		this->sec = bcdToDec(dataBuf[SEC_ADDR]);
-		this->min = bcdToDec(dataBuf[MIN_ADDR]);
-		this->hour = bcdToDec(dataBuf[HOUR_ADDR]);
+		this->sec = dataBuf[SEC_ADDR];
+		this->min = dataBuf[MIN_ADDR];
+		this->hour = dataBuf[HOUR_ADDR];
 
 		cout<<"The time is: " << this->hour << " : " << this->min << " : " << this->sec <<endl;
 
