@@ -101,6 +101,8 @@ int DST::getTimeDate() {
 
 		cout<<"The time is: " << this->hour << ":" << this->min << ":" << this->sec <<endl;
 		cout<<"The date is: " << this->day << "/" << this->date << "/" << this->year <<endl;
+	
+		close(file);
 
 		return 0;
 }
