@@ -29,12 +29,12 @@ using namespace std;
 #define TEMP_ADDR_MSB	0x11
 #define TEMP_ADDR_LSB	0x12
 
-#define DEV_ADDRESS		0x68  //Set device address in memory
+//#define DEV_ADDRESS		0x68  //Set device address in memory
 
 
 //#Define i2cBUSNumber 1
 
-DST::DST(int i2cBUS, char deviceAddress){
+DST::DST(int i2cBUS, int deviceAddress){
 
 		this->BUSNumber = i2cBUS;
 		this->I2CAddress = deviceAddress;
@@ -64,8 +64,8 @@ int DST::getTime() {
 			return(1);   //returning 1 exits the programme
 		}
 
-		if(ioctl(file, I2C_SLAVE, DEV_ADDRESS) < 0){   //file refers to a yes/no here - i.e. if (file) bus is open and return is 0
-			cout<<"Failed to connect to the device at " << DEV_ADDRESS << " " << endl;
+		if(ioctl(file, I2C_SLAVE, I2CAddress) < 0){   //file refers to a yes/no here - i.e. if (file) bus is open and return is 0
+			cout<<"Failed to connect to the device at 0x68 " << endl;
 			return(2);    //Why return 2 here?
 		}
 
@@ -73,7 +73,7 @@ int DST::getTime() {
 		//initialise i2c comms stop/start by sending the first address in write mode
 		char buf[1] = {0x00};  //not used for anything other than starting transfer
 
-		if(write(buf, DEV_ADDRESS, 1) != 1){
+		if(write(file, buf, 1) != 1){
 			cout<<"Failed to reset the register address " << endl;
 		}
 

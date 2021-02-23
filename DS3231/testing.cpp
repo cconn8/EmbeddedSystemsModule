@@ -15,7 +15,7 @@ static int file;
 
 //converts decimal  to (bcd) time to write to registers
 uint8_t decToBcd(int val){
-	return (uint8_t)((val/10)*16 + (val%10));
+	return ((val/10)*16 + (val%10));
 }
 
 //converts binary encoded decimal (bcd) time from the registers to normal decimal time

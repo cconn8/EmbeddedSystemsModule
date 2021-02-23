@@ -19,11 +19,11 @@ class DST {
 		int min;
 		int hour;
 		int BUSNumber;
-		char I2CAddress;
+		int  I2CAddress;
 		char buffer[I2C_LENGTH];
 
 	public:
-		DST(int i2cBUS, char deviceAddress);
+		DST(int i2cBUS, int deviceAddress);
 
 		int bcdToDec(char b);
 		virtual int getTime();
