@@ -24,6 +24,11 @@ Device::Device() {
 	this->hours = 5;
 }
 
+
+int Device::decToBcd(int b){
+	return (b/10)*16 + (b/10);
+}
+
 int Device::bcdToDec(char b) {
 		return (b/16)*10 + (b%16);
 }
@@ -60,11 +65,15 @@ int Device::getTime(){
 		return 2;
 	}
 
-	cout<<"Seconds Register " << buffer[0] << " :  " << bcdToDec(buffer[0]) << "\n";
-	cout<<"Minutes Register " << buffer[1] << " :  " << bcdToDec(buffer[1]) << "\n" ;
-	cout<<"Hours Register " << buffer[2] << " :  " << bcdToDec(buffer[2]) << "\n";
+	cout<<"Seconds Register [ " << buffer[0] << " ] :  " << bcdToDec(buffer[0]) << "\n";
+	cout<<"Minutes Register  [ " << buffer[1] << " ] :  " << bcdToDec(buffer[1]) << "\n" ;
+	cout<<"Hours Register  [ " << buffer[2] << " ] :  " << bcdToDec(buffer[2]) << "\n\n";
 
+	cout<<"Time is hr:min:sec"<<endl;
+	cout<<"The RTC time is - "<< bcdToDec(buffer[2]) << ":" <<bcdToDec(buffer[1]) << ":" << bcdToDec(buffer[0]) << "\n" <<  endl;
 
+	cout<<"Date is  WeekDay / Date / Year " <<endl;
+	cout<<"The RTC date is - "<< bcdToDec(buffer[5]) << "/" <<bcdToDec(buffer[4]) << "/" << bcdToDec(buffer[3]) << "\n" << endl;
 
 	close(file);
 	return 0;
@@ -90,14 +99,17 @@ int Device::setTime(){
 		return 1;
 	}
 
-	char writeBuffer[4];
+	char writeBuffer[7];  
 	writeBuffer[0] = 0x00; //initial address (superficial write (slave address) - blank values
-	writeBuffer[1] = 0x01;  //should write 1 to reg 1
-	writeBuffer[2] = 0x01;
-	writeBuffer[3] = 0x01;
+	writeBuffer[1] = 0x01; //seconds reg - is in fact register 0 but due to slave set it is bumped to index 1 - write auto incremented
+	writeBuffer[2] = 0x01; //mins
+	writeBuffer[3] = 0x22; //hour
+	writeBuffer[4] = 0x02; //day
+	writeBuffer[5] = 0x22; //date
+	writeBuffer[6] = 0x01; //month
 
 	//initial write to SET
-	if(write(file, writeBuffer, 4) != 4){
+	if(write(file, writeBuffer, 7) != 7){
 		cout<<"Failed to write to device .. "<<endl;
 		return 5;
 	}
@@ -107,14 +119,32 @@ int Device::setTime(){
 		return 1;
 	}
 
-	cout<<"Seconds register " <<  buffer[0] << " :  " << bcdToDec(buffer[1]) <<endl;
-	cout<<"Minutes register " << buffer[1] << " :  " << bcdToDec(buffer[2]) <<endl;
-	cout<<"Hours register " << buffer[2] << " :  " << bcdToDec(buffer[3]) <<endl;
+//	cout << "Seconds register [ " <<  buffer[0] << " ] set to :  " << bcdToDec(buffer[0]) <<endl;
+//	cout << "Minutes register [ " << buffer[1] << " ] set to :  " << bcdToDec(buffer[1]) <<endl;
+//	cout << "Hours register [ " << buffer[2] << " ] set to :  " << bcdToDec(buffer[2]) <<endl;
+//	cout << "Day register [ " << buffer[3]  << " ] set to : " << bcdToDec(buffer[3]) << endl;
+//	cout << "Date register [ " << buffer[4] << " ] set to : " << bcdToDec(buffer[4]) << endl;
+//	cout << "Month register [ " << buffer[5] << " ] set to : " << bcdToDec(buffer[5]) << endl;
 
+	getTime();
 
 	close(file);
 	return 0;
 }
+
+
+int Device::getTemp(){
+
+return 0;
+
+}
+
+int Device::setAlarm1(){
+
+return 0;
+
+}
+
 Device::~Device() {
 	// TODO Auto-generated destructor stub
 }

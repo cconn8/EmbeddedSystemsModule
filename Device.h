@@ -16,9 +16,12 @@ private:
 public:
 
 	Device();
+	virtual int decToBcd(int b);
 	virtual int getTime();
 	virtual int setTime();
+	virtual int getTemp();
 	virtual int bcdToDec(char b);
+	virtual int setAlarm1();
 	virtual ~Device();
 };
 
