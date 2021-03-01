@@ -22,6 +22,8 @@ public:
 	virtual int getTemp();
 	virtual int bcdToDec(char b);
 	virtual int setAlarm1();
+	virtual int sqTest();
+//	virtual void resetPointer(int file, char *);
 	virtual ~Device();
 };
 

@@ -65,9 +65,9 @@ int Device::getTime(){
 		return 2;
 	}
 
-	cout<<"Seconds Register [ " << buffer[0] << " ] :  " << bcdToDec(buffer[0]) << "\n";
-	cout<<"Minutes Register  [ " << buffer[1] << " ] :  " << bcdToDec(buffer[1]) << "\n" ;
-	cout<<"Hours Register  [ " << buffer[2] << " ] :  " << bcdToDec(buffer[2]) << "\n\n";
+//	cout<<"Seconds Register [ " << buffer[0] << " ] :  " << bcdToDec(buffer[0]) << "\n";
+//	cout<<"Minutes Register  [ " << buffer[1] << " ] :  " << bcdToDec(buffer[1]) << "\n" ;
+//	cout<<"Hours Register  [ " << buffer[2] << " ] :  " << bcdToDec(buffer[2]) << "\n\n";
 
 	cout<<"Time is hr:min:sec"<<endl;
 	cout<<"The RTC time is - "<< bcdToDec(buffer[2]) << ":" <<bcdToDec(buffer[1]) << ":" << bcdToDec(buffer[0]) << "\n" <<  endl;
@@ -101,10 +101,10 @@ int Device::setTime(){
 
 	char writeBuffer[7];  
 	writeBuffer[0] = 0x00; //initial address (superficial write (slave address) - blank values
-	writeBuffer[1] = 0x05; //seconds reg - is in fact register 0 but due to slave set it is bumped to index 1 - write auto incremented
-	writeBuffer[2] = 0x05; //mins
-	writeBuffer[3] = 0x05; //hour
-	writeBuffer[4] = 0x05; //day
+	writeBuffer[1] = 0x00; //seconds reg - is in fact register 0 but due to slave set it is bumped to index 1 - write auto incremented
+	writeBuffer[2] = 0x30; //mins
+	writeBuffer[3] = 0x72; //hour - 7 sets 0 & 3x 1's in highest niblle for 12hr mode and PM
+	writeBuffer[4] = 0x05; //day - Friday
 	writeBuffer[5] = 0x05; //date
 	writeBuffer[6] = 0x05; //month
 
@@ -189,7 +189,66 @@ int Device::getTemp(){
 
 }
 
+//void Device::resetPointer(file, 0x00){
+//
+//	char setPointer[1] = 0x00;
+//	if(write(file, setPointer, 1) != 1){
+//		cout<<"Failed to reset pointer.."<<endl;
+//		return 2;
+//	}
+//
+//}
+
 int Device::setAlarm1(){
+
+	char buffer[19];
+	snprintf(buffer, 19, "/dev/i2c-1");
+
+	int file;
+	if((file = open(buffer, O_RDWR) < 0)){
+		cout<<"Failed to open bus! " << endl;
+		return 1;
+	}
+
+
+	if ( ioctl (file, I2C_SLAVE, 0x68) < 0){
+		cout<<"Failed to connect to sensor in set Alarm1!"<<endl;
+		return 1;
+	}
+
+
+	/*set alarm clock for 12:30:10 with all 0's in bit 7 (A1Mx bits) and 1 in DY/DT bit
+	to trigger alarm when day, hours and minutes match*/
+	char writeBuffer[5];
+	writeBuffer[0] = 0x07; //sets pointer to first alarm register @ 0x07 
+	writeBuffer[1] = 0x10;
+	writeBuffer[2] = 0x32;
+	writeBuffer[3] = 0x72;
+	writeBuffer[4] = 0x45;
+
+	if(write(file, writeBuffer, 5) != 5){
+		cout<<"Failed to set alarm1 in write"<<endl;
+		return 6;
+	}
+
+//	resetPointer(file, 0x00);
+//	char setPtr[1] = 0x00;
+//	if(write(file, setPtr, 1)!=1){
+//		cout<<"Failed to reset pointer"<<endl;
+//		return 2;
+//	}
+
+
+	char setCtrl[2];
+	setCtrl[0] = 0x0E;
+	setCtrl[1] = 0x04;  //sets control reg to all zeros except INTCN & A1IE
+	if(write(file, setCtrl, 2) != 2){
+		cout<<"Failed to set alarm control register .. "<<endl;
+		return 3;
+	}
+
+	close(file);
+
 
 	return 0;
 }
@@ -254,9 +313,11 @@ int main(){
 
 	Device test;
 //	test.getTime();
+//	test.setTime();
+//	test.getTime();
+//	test.getTemp();
+//	test.sqTest();
 	test.setTime();
-	test.getTemp();
-	test.sqTest();
-
+	test.setAlarm1();
 	return 0;
 }
