@@ -101,12 +101,12 @@ int Device::setTime(){
 
 	char writeBuffer[7];  
 	writeBuffer[0] = 0x00; //initial address (superficial write (slave address) - blank values
-	writeBuffer[1] = 0x01; //seconds reg - is in fact register 0 but due to slave set it is bumped to index 1 - write auto incremented
-	writeBuffer[2] = 0x01; //mins
-	writeBuffer[3] = 0x22; //hour
-	writeBuffer[4] = 0x02; //day
-	writeBuffer[5] = 0x22; //date
-	writeBuffer[6] = 0x01; //month
+	writeBuffer[1] = 0x05; //seconds reg - is in fact register 0 but due to slave set it is bumped to index 1 - write auto incremented
+	writeBuffer[2] = 0x05; //mins
+	writeBuffer[3] = 0x05; //hour
+	writeBuffer[4] = 0x05; //day
+	writeBuffer[5] = 0x05; //date
+	writeBuffer[6] = 0x05; //month
 
 	//initial write to SET
 	if(write(file, writeBuffer, 7) != 7){
@@ -114,19 +114,26 @@ int Device::setTime(){
 		return 5;
 	}
 
+
+	char restart[1] = {0x00};
+	if(write(file, restart, 1) != 1){
+	cout<<"failed to reset before reading the set values"<<endl;
+	return 2;
+	}
+
 	if(read(file, buffer, 19) != 19){
 		cout<<"Failed to read in buffer " << endl;
 		return 1;
 	}
 
-//	cout << "Seconds register [ " <<  buffer[0] << " ] set to :  " << bcdToDec(buffer[0]) <<endl;
-//	cout << "Minutes register [ " << buffer[1] << " ] set to :  " << bcdToDec(buffer[1]) <<endl;
-//	cout << "Hours register [ " << buffer[2] << " ] set to :  " << bcdToDec(buffer[2]) <<endl;
-//	cout << "Day register [ " << buffer[3]  << " ] set to : " << bcdToDec(buffer[3]) << endl;
-//	cout << "Date register [ " << buffer[4] << " ] set to : " << bcdToDec(buffer[4]) << endl;
-//	cout << "Month register [ " << buffer[5] << " ] set to : " << bcdToDec(buffer[5]) << endl;
+	cout << "Seconds register [ " <<  buffer[0] << " ] set to :  " << bcdToDec(buffer[0]) <<endl;
+	cout << "Minutes register [ " << buffer[1] << " ] set to :  " << bcdToDec(buffer[1]) <<endl;
+	cout << "Hours register [ " << buffer[2] << " ] set to :  " << bcdToDec(buffer[2]) <<endl;
+	cout << "Day register [ " << buffer[3]  << " ] set to : " << bcdToDec(buffer[3]) << endl;
+	cout << "Date register [ " << buffer[4] << " ] set to : " << bcdToDec(buffer[4]) << endl;
+	cout << "Month register [ " << buffer[5] << " ] set to : " << bcdToDec(buffer[5]) << endl;
 
-	getTime();
+//	getTime();
 
 	close(file);
 	return 0;
@@ -135,28 +142,68 @@ int Device::setTime(){
 
 int Device::getTemp(){
 
-return 0;
+
+	char buffer[19];
+	snprintf(buffer, 19, "/dev/i2c-1");	
+
+	int file;
+	
+	if((file = open(buffer, O_RDWR)) < 0){
+		cout<<"Failed to open bus"<<endl;
+		return 1;
+	}
+
+
+	if(ioctl(file, I2C_SLAVE, 0x68) < 0){
+		cout<<"Failed to connect to I2C sensor to read temp.." <<endl;
+		return 1;
+	}
+
+
+	char resetBuf[1] = {0x00};
+	
+	if(write(file, resetBuf, 1) != 1){
+		cout<<"Failed to initialise pointer to register 1"<<endl;
+		return 2;
+	}
+
+
+	if(read(file, buffer, 19)!=19){
+		cout<<"Failed to read in registers " <<endl;
+		return 1;
+	}
+
+
+	//create 16bit variable to store temp
+	short temp =  buffer[0x11]; //second 8 bit of 16 temp takes MSB of temp
+	temp = temp + ((buffer[0x12]>>6)*0.25);
+	float temperature = bcdToDec(temp);
+
+	cout<< "The temperature is: " << temperature << " degrees"<<endl;
+
+
+	close(file);
+
+
+	return 0;
 
 }
 
 int Device::setAlarm1(){
 
-return 0;
-
+	return 0;
 }
 
-Device::~Device() {
-	// TODO Auto-generated destructor stub
+Device::~Device(){
 }
-
 
 
 int main(){
 
 	Device test;
-	test.getTime();
+//	test.getTime();
 	test.setTime();
-
+	test.getTemp();
 
 	return 0;
 }
