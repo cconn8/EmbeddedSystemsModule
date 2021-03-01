@@ -194,6 +194,58 @@ int Device::setAlarm1(){
 	return 0;
 }
 
+int Device::sqTest(){
+
+	char buffer[19];
+	snprintf(buffer, 19, "/dev/i2c-1");
+
+
+	int file;
+	if((file = open(buffer, O_RDWR)) < 0){
+		cout<<"Failed to open bus.."<<endl;
+		return 1;
+	}
+
+	if(ioctl(file, I2C_SLAVE, 0x68) < 0){
+		cout<<"Failed to connect to sensor for sqTest.. "<< endl;
+		return 1;
+	}
+
+	char setPointer[1] = {0x00}; //set pointer to control register
+	if(write(file, setPointer, 1) != 1){
+		cout<<"Failed to reset registers for sq" <<endl;
+		return 2;
+	}
+
+	if(read(file, buffer, 19) != 19){
+		cout<< "Failed to read registers! " <<endl;
+		return 1;
+	}
+
+
+	char ctrl = buffer[0x0E];
+	ctrl = ctrl ^ (0x03 << 3);
+	ctrl = ctrl ^ (0x01 << 2);
+
+	char resetPointer[2];
+	resetPointer[0] = 0x0E;
+	resetPointer[1] = ctrl;
+
+
+	if(write(file, resetPointer, 2) != 2){
+		cout<<"Failed to write square values to device"<<endl;
+		return 4;
+	}
+
+	cout<<"successful write to device"<<endl;
+
+	close(file);
+
+	return 0;
+
+
+}
+
 Device::~Device(){
 }
 
@@ -204,6 +256,7 @@ int main(){
 //	test.getTime();
 	test.setTime();
 	test.getTemp();
+	test.sqTest();
 
 	return 0;
 }
