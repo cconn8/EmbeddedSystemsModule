@@ -257,6 +257,7 @@ int Device::setAlarm1(){
 	return 0;
 }
 
+
 int Device::sqTest(){
 
 	char buffer[19];
