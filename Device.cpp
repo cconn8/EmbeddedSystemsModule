@@ -96,7 +96,7 @@ int Device::reset(){
 
 //This ensures INTCN & A1IE/A2IE bits are set to 1
 //takes alarm number
-int Device::setCtrlBits( int alarm){
+int Device::setAlmCtrlBits( int alarm){
 
 	if(alarm < 1 || alarm > 2){
 		cout<<"You must specify which alarm"<<endl;
@@ -105,7 +105,7 @@ int Device::setCtrlBits( int alarm){
 
 		char setCtrl[3];
 		setCtrl[0] = 0x0E;  					//sets pointer to control register address - values follow
-		if(alarm == 1){ setCtrl[1] = 0x05; }  	//00000101 sets control reg to all zeros except INTCN & A1IE (alarm 1)
+		if(alarm == 1){ setCtrl[1] = 0x1D; }  	//00011101 sets control reg to all zeros except rs1,rs2, INTCN & A1IE (alarm 1)
 		else { setCtrl[1] = 0x06; } 			//00000110 sets control reg to all zeros except INTCN & A2IE (alarm 2)
 		setCtrl[2] = 0x88; 						//10001000 clears the alarm flag bits to zero (A1F set to 1 on match)
 		
@@ -116,6 +116,18 @@ int Device::setCtrlBits( int alarm){
 
 		cout<<"Alarm "<< alarm <<" control bits set!"<<endl;
 		return 0;
+}
+
+int Device::flushAlmFlags(){
+	char flush[2];
+	flush[0] = 0x0f;		//address of control status register with Alarm Flags
+	flush[1] = 0x88;
+
+	if(write(file, flush, 2) != 2){
+		cout<<"Failed to flush flags"<<endl;
+		return 1;
+	}
+	return 0;
 }
 
 int Device::setCtrlReg(){
@@ -147,21 +159,23 @@ int Device::send(char const* buffer){
 	}
 	return 0;
 }
+													//Used for setting higher bits (6,7,8) in certain registers i.e. Aalrm masks
+													//without impacting the alarm times
+int Device::shiftXOR(int val, int shift){			//takes a value as input and shifts to leeft
+	char temp = 0x01;
+	val = val ^ (temp<<shift);						//shifts left by shift values
+	return val;										//XORs the two 8 bits
+}
+
 
 int Device::getTime(){
 
 	openBus();
 	cout<<"\nDevice reads as follows..."<<endl;
 
-	snprintf(this->buffer, sizeof(this->buffer),"/dev/i2c-1"); 	//attaches to bus
-
 	setSlave(DS3231_ADDR); 										//open communication with sensor at address 0x68				
 	reset(); 													//set first register in write mode to start
-
-	if(read(this->file, this->buffer, 19) != 19){ 				//read in all registers to memory
-		cout<<"Failed to read from device"<<endl;
-		return 2;
-	}
+	readFullBuffer();											//reads in all registers to memory
 
 	cout<<"Time is HR : MIN : SEC"<<endl;
 	cout<<"The RTC time is - "<< bcdToDec(this->buffer[2]) << ":" <<bcdToDec(this->buffer[1]) << ":" << bcdToDec(this->buffer[0]) << "\n" <<  endl;
@@ -184,7 +198,6 @@ int Device::setTime(int hours, int mins, int secs){
 
 	openBus();  						//method opens connection in SLAVE 
 	cout<<"\nSetting time on the RTC..."<<endl;
-	snprintf(this->buffer, sizeof(this->buffer), "/dev/i2c-1");
 	
 	setSlave(DS3231_ADDR); 				//open communication with sensor at address 0x68 in SLAVE mode				
 	reset(); 							//set first register in write mode to start
@@ -199,7 +212,7 @@ int Device::setTime(int hours, int mins, int secs){
 	reset(); 							//reset in pointer to first register in between read/writes	
 	readFullBuffer();					//Read in all registers to memory
 
-	cout << "Time set \nWeekday : "<< bcdToDec(this->buffer[5]) <<"\nDate : "<< bcdToDec(this->buffer[6]) << "\nMonth : "<< bcdToDec(this->buffer[7]) << "\n\nTime in Hrs : Mins : Secs \n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
+	cout<< "\nTime set [Hrs : Mins : Secs]\n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
 
 	close(this->file);
 	cout<<"- Bus Closed! - \n"<<endl;
@@ -215,8 +228,6 @@ int Device::setDate(int day, int date, int month, int year){
 	this->year = year;
 	openBus();
 	cout<<"\nSetting Date on the RTC..."<<endl;
-
-	snprintf(this->buffer, sizeof(this->buffer), "/dev/i2c-1");
 	
 	setSlave(DS3231_ADDR); 					//open communication with sensor at address 0x68				
 	reset(); 								//superficial (blank) write to reset the pointer to first reg
@@ -241,8 +252,7 @@ int Device::setDate(int day, int date, int month, int year){
 
 int Device::getTemp(){
 
-	openBus();
-	snprintf(this->buffer, 19, "/dev/i2c-1");	
+	openBus();	
 
 	setSlave(DS3231_ADDR); 							//open communication with sensor at address 0x68				
 	reset(); 										//set first register in write mode to start
@@ -270,16 +280,16 @@ int Device::setAlarm1(){
 	setSlave(DS3231_ADDR); //open communication with sensor at address 0x68	
 
 	//Set INTCN and A1IE bits to logic one in the control register
-	//ensure alarm flags are flushed to 0 in control status register
-	setCtrlBits(1);			
+	//ensures alarm flags are flushed to 0 in control status register
+	setAlmCtrlBits(1);			
 
 	//set alarm clock for 12:30:10 with all 0's in bit 7 (A1Mx bits) and 1 in DY/DT bit
 	//to trigger alarm when day, hours and minutes match
 	char writeBuffer[5];
 	writeBuffer[0] = 0x07; 		//sets pointer to first alarm register @ 0x07 
-	writeBuffer[1] = 0x10; 		//A1 secs
-	writeBuffer[2] = 0x00; 		//A1 mins
-	writeBuffer[3] = 0x00; 		//A1 hours (
+	writeBuffer[1] = 0x86; 		//A1 secs
+	writeBuffer[2] = 0x80; 		//A1 mins
+	writeBuffer[3] = 0x80; 		//A1 hours (
 	writeBuffer[4] = 0x41; 		//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
 
 	send(writeBuffer);			//writes the writeBuffer to the device using i2c write method
@@ -297,23 +307,82 @@ int Device::setAlarm1(){
 	return 0;
 }
 
+int Device::setAlarm(int alarm){
+
+	openBus();
+	setSlave(DS3231_ADDR);
+
+	if(alarm == 1){
+
+		//SET ALARM FOR ONCE PER SECOND BY SETTING MASK BITS TO 1 USING shiftXOR method
+		//Set INTCN and A1IE bits to logic one in the control register
+		//ensure alarm flags are flushed to 0 in control status register
+		setAlmCtrlBits(1);		//takes alarm number as argument
+		char writeBuffer[5];		
+		writeBuffer[0] = ALM1_SEC_ADDR;				//sets pointer to first alarm reg 0x07
+		writeBuffer[1] = shiftXOR(decToBcd(10), 7); 		//A1 secs - shift 1 << 
+		writeBuffer[2] = shiftXOR(decToBcd(30), 7); 	 	//A1 mins
+		writeBuffer[3] = shiftXOR(decToBcd(12), 7); 	 	//A1 hours (
+		writeBuffer[4] = shiftXOR(decToBcd(12), 7); 		//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
+
+		for(int i=0; i<10; i++){							//For loop to test alarm per second by flushing flag reg eery second
+			send(writeBuffer);								//successful - alarm retriggers flag every second
+			cout<<"Alarm 1 set!"<<endl;
+			sleep(1);
+			flushAlmFlags();									//bring alarm flag back to zero for next match
+		}
+
+		close(file);
+
+	}else if(alarm == 2){
+
+		//SET ALARM FOR ONCE PER MINUTE -ALARM MASKS [1,1,0] - USING shiftXOR to set DY/DT to 1 for Date
+		//Set INTCN and A2IE bits to logic one in the control register
+		//ensure alarm flags are flushed to 0 in control status register
+		setAlmCtrlBits(2);							//takes alarm number as argument
+		char writeBuffer[4];	
+		writeBuffer[0] = ALM2_MIN_ADDR;				//sets pointer to first alarm reg 0x07
+		writeBuffer[1] = decToBcd(31); 				//mins
+		writeBuffer[2] = decToBcd(12); 				//A1 mins
+		writeBuffer[3] = shiftXOR(decToBcd(15), 6); //A1 Date mode enabled by shifting 1 << 6 positions and ^ for high DY/DT
+		writeBuffer[4] = 0x41; 						//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
+
+		send(writeBuffer);
+		cout<<"Alarm 2 set!"<<endl;
+		flushAlmFlags();							//bring alarm flag back to zero for next match
+		close(file);
+	}
+	
+		return 0;
+}
+
 int Device::alarmTest(){  //triggers alarm once per second
 
 	openBus();
 	setSlave(DS3231_ADDR); //open communication with sensor at address 0x68	
+	reset();
 
 	//Set INTCN and A1IE bits to logic one in the control register
 	//ensure alarm flags are flushed to 0 in control status register
-	setCtrlBits(1);		//takes alarm number as argument
-	char writeBuffer[5];
-	writeBuffer[0] = 0x07; 				//sets pointer to first alarm register @ 0x07 
-	writeBuffer[1] = decToBcd(66); 		//A1 secs - Hex 66 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
-	writeBuffer[2] = decToBcd(66); 		//A1 mins - this triggers an alarm per second
-	writeBuffer[3] = decToBcd(66);  	//A1 hours 
-	writeBuffer[4] = decToBcd(66);  	//A1 day 
+	setAlmCtrlBits(1);		//takes alarm number as argument
 
-	send(writeBuffer);
-	close(file);
+
+		char writeBuffer[5];
+		writeBuffer[0] = 0x07; 				//sets pointer to first alarm register @ 0x07 
+		writeBuffer[1] = decToBcd(80); 		//A1 secs - Hex 66 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
+		writeBuffer[2] = decToBcd(80); 		//A1 mins - this triggers an alarm per second
+		writeBuffer[3] = decToBcd(80);  	//A1 hours 
+		writeBuffer[4] = 0x81;  			//A1 day 
+
+		send(writeBuffer);
+		
+		for(int i=0; i<10; i++){			//Tests alarm every second by flushing the flag to see does it trigger
+			cout<<"ALARM!"<<endl;
+			sleep(1);
+			flushAlmFlags();				//returns AF1 and AF2 back to zero LED should come back on seeing as INTCN is high
+			sleep(1);						//Once a flag goes high it stays high until flushed again so this is required
+		}
+
 	return 0;
 }
 
@@ -333,20 +402,19 @@ int Device::sqTest(){
 
 	reset();
 	char ctrl = this->buffer[0x0E];		//initial - 0001 1100
-	ctrl = ctrl ^ (0x07 << 3);  		//shifts 111 3 to the left and XORs to make buts 3,4,5 [0s]
+	ctrl = ctrl ^ (0x07 << 3);  		//shifts 111 3 to the left and XORs to make btts 3,4,5 [0s]
 
 	char sendBits[2];
 	sendBits[0] = 0x0E;  				//point to control register at 0x0e
 	sendBits[1] = ctrl;  				//send XOR'd vaues
 
-	send(sendBits);						//uses i2c write to check and send the "sendBits" data
-	setCtrlReg();  						//reset control register original values
+	send(sendBits);						//uses i2c write() to check and send the "sendBits" data
+	//setCtrlReg();  					//reset control register original values
 
 
-	cout<<"successful write to device"<<endl;
-	
-	close(this->file);
-	cout<<"- Bus Closed! -\n"<<endl;
+	cout<<"successful write to device"<<endl;	
+	//close(this->file);
+	//cout<<"- Bus Closed! -\n"<<endl;
 	return 0;
 
 
@@ -358,10 +426,14 @@ Device::~Device(){
 int main(){
 
 	Device test;
-//	test.setTime(22,22,22);
+	test.setTime(0,0,0);		//setTime takes args [Hrs, Mins, Secs]
 //	test.getTemp();
-	test.sqTest();
-	test.alarmTest();
+//	test.setAlarm1();			//testing alarm values with masks (1) in AM1 - A1M3 and 0 in A1M4 to trigger on seconds match
+//	test.alarmTest();
+//	test.sqTest();				//sqTest sets RS1 & RS2 bits to 1 - setting frequency to 1Hz (once per second!) (use enums as args to make better)
 //	test.setAlarm1();
+	test.setAlarm(1);
+	sleep(20);
+	test.setAlarm(2);
 	return 0;
 }
