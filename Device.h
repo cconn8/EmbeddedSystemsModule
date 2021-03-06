@@ -13,7 +13,7 @@
 class Device {
 
 private:
-	int file;
+	int file, hours, mins, secs, day, month, date, year;
 	char buffer[REGISTERS]; //store i2c registers
 public:
 
@@ -27,10 +27,14 @@ public:
 	virtual int setCtrlBits(int alarm);
 	virtual int setCtrlReg();
 	virtual int getTime();
-	virtual int setTime();
+	virtual int setTime(int hours, int mins, int secs);
+	virtual int setDate(int Day, int Date, int Month, int Year);
 	virtual int getTemp();
 	virtual int setAlarm1();
 	virtual int sqTest();
+	virtual int readFullBuffer();
+	virtual int send(char const* buffer); 			//wraps i2c check/write method to be used throughout
+	virtual int alarmTest();
 	virtual ~Device();
 };
 
