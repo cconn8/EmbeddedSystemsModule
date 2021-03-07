@@ -18,47 +18,18 @@ using namespace std;
 
 Device::Device() {
 
-	cout<<"Starting communication to DS3231"<<endl;
-//	openBus();
-	getTime();
+	cout<<"Starting communication to DS3231..."<<endl;
+//openBus();
+//	getTime();
 
 }
-
-/*char Device::weekDay(int weekday){
-	char day[20];
-	switch (day){
-		case 1:
-		day = "Monday \0";
-		break;
-		case 2:
-		day = "Tuesday \0";
-		break;
-		case 3:
-		day = "Wednesday \0";
-		break;
-		case 4:
-		day = "Thursday\0";
-		break;
-		case 5:
-		day = "Friday\0";
-		break;
-		case 6:
-		day = "Saturday\0";
-		break;
-		case 7:
-		day = "Sunday\0";
-		break;
-	}
-
-	return day;
-}*/
 
 int Device::decToBcd(int b){
 	return (b/10)*16 + (b%10);
 }
 
 int Device::bcdToDec(char b) {
-		return (b/16)*10 + (b%16);
+	return (b/16)*10 + (b%16);
 }
 
 int Device::openBus(){
@@ -80,7 +51,6 @@ int Device::setSlave( char slaveAddress){
 		cout<<"Failed to connect to sensor!"<<endl;
 		return 1;
 	}
-
 	return 0;
 }
 
@@ -90,7 +60,6 @@ int Device::reset(){
 		cout<<"Failed to reset address pointer"<<endl;
 		return 2;
 	}
-
 	return 0;
 }
 
@@ -102,18 +71,16 @@ int Device::setAlmCtrlBits( int alarm){
 		cout<<"You must specify which alarm"<<endl;
 		return 1;
 	}
-
 		char setCtrl[3];
 		setCtrl[0] = 0x0E;  					//sets pointer to control register address - values follow
 		if(alarm == 1){ setCtrl[1] = 0x1D; }  	//00011101 sets control reg to all zeros except rs1,rs2, INTCN & A1IE (alarm 1)
-		else { setCtrl[1] = 0x06; } 			//00000110 sets control reg to all zeros except INTCN & A2IE (alarm 2)
+			else { setCtrl[1] = 0x06; } 			//00000110 sets control reg to all zeros except INTCN & A2IE (alarm 2)
 		setCtrl[2] = 0x88; 						//10001000 clears the alarm flag bits to zero (A1F set to 1 on match)
 		
 		if(write(this->file, setCtrl, 2) != 2){
 			cout<<"Failed to set alarm control register .. "<<endl;
 			return 3;
 		}
-
 		cout<<"Alarm "<< alarm <<" control bits set!"<<endl;
 		return 0;
 }
@@ -177,14 +144,14 @@ int Device::getTime(){
 	reset(); 													//set first register in write mode to start
 	readFullBuffer();											//reads in all registers to memory
 
-	cout<<"Time is HR : MIN : SEC"<<endl;
-	cout<<"The RTC time is - "<< bcdToDec(this->buffer[2]) << ":" <<bcdToDec(this->buffer[1]) << ":" << bcdToDec(this->buffer[0]) << "\n" <<  endl;
+	cout<<"The RTC time in hr : min : sec is"<<endl;
+	cout<<"- " << bcdToDec(this->buffer[2]) << ":" <<bcdToDec(this->buffer[1]) << ":" << bcdToDec(this->buffer[0]) << "\n" <<  endl;
 
-	cout<<"Date is  WeekDay / Date / Year " <<endl;
-	cout<<"The RTC date is - "<< bcdToDec(this->buffer[5]) << "/" <<bcdToDec(this->buffer[4]) << "/" << bcdToDec(this->buffer[3]) << "\n" << endl;
+	//cout<<"Date is  WeekDay - Date  Year " <<endl;
+	cout<<"The RTC date is: "<< endl;
+	cout<<"Day : " << bcdToDec(this->buffer[3]) << "\nDate : " << bcdToDec(this->buffer[4]) << "\nMonth : " << bcdToDec(this->buffer[5]) << "\nYear : " << bcdToDec(this->buffer[6]) << endl;
 
 	close(this->file);
-	cout<<"- Bus Closed! - \n"<<endl;
 	return 0;
 };
 
@@ -215,7 +182,6 @@ int Device::setTime(int hours, int mins, int secs){
 	cout<< "\nTime set [Hrs : Mins : Secs]\n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
 
 	close(this->file);
-	cout<<"- Bus Closed! - \n"<<endl;
 	return 0;
 }
 
@@ -246,7 +212,6 @@ int Device::setDate(int day, int date, int month, int year){
 	cout << "Time set \nWeekday : "<< bcdToDec(this->buffer[5]) <<"\nDate : "<< bcdToDec(this->buffer[6]) << "\nMonth : "<< bcdToDec(this->buffer[7]) << "\n\nTime in Hrs : Mins : Secs \n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
 
 	close(this->file);
-	cout<<"- Bus Closed! - \n"<<endl;
 	return 0;
 }
 
@@ -266,7 +231,6 @@ int Device::getTemp(){
 	cout<< "The temperature is: " << temperature << "°C"<<endl;
 
 	close(this->file);
-	cout<<"- Bus Closed! - \n"<<endl;
 	return 0;
 
 }
@@ -303,7 +267,6 @@ int Device::setAlarm1(){
 
 	getTime();
 	close(file);
-	cout<<"- Bus Closed!\n"<<endl;
 	return 0;
 }
 
@@ -352,19 +315,19 @@ int Device::setAlarm(int alarm){
 		flushAlmFlags();							//bring alarm flag back to zero for next match
 		close(file);
 	}
-	
+
 		return 0;
 }
 
-int Device::alarmTest(){  //triggers alarm once per second
+int Device::alarmTest(){  							//triggers alarm once per second
 
 	openBus();
-	setSlave(DS3231_ADDR); //open communication with sensor at address 0x68	
+	setSlave(DS3231_ADDR); 							//open communication with sensor at address 0x68	
 	reset();
 
 	//Set INTCN and A1IE bits to logic one in the control register
 	//ensure alarm flags are flushed to 0 in control status register
-	setAlmCtrlBits(1);		//takes alarm number as argument
+	setAlmCtrlBits(1);						//takes alarm number as argument
 
 
 		char writeBuffer[5];
@@ -423,17 +386,44 @@ Device::~Device(){
 }
 
 
-int main(){
+int main(int argc, char* args[]){
 
+	string arg;
 	Device test;
-	test.setTime(0,0,0);		//setTime takes args [Hrs, Mins, Secs]
-//	test.getTemp();
-//	test.setAlarm1();			//testing alarm values with masks (1) in AM1 - A1M3 and 0 in A1M4 to trigger on seconds match
-//	test.alarmTest();
-//	test.sqTest();				//sqTest sets RS1 & RS2 bits to 1 - setting frequency to 1Hz (once per second!) (use enums as args to make better)
-//	test.setAlarm1();
-	test.setAlarm(1);
-	sleep(20);
-	test.setAlarm(2);
-	return 0;
+	
+	if(argc == 2){
+		arg = args[1];
+		if(arg == "Time" || arg == "time"){
+			test.getTime();
+
+		} else if(arg == "Temperature" || arg == "temperature" || arg == "Temp" || arg == "temp"){
+			test.getTemp();
+
+		}
+
+		return 0;
+	} 
+	else cout<<"Invalid argument(s)"<<endl;
+	return 1;
+
+
+	// //if(args[0] == "Time" || args[0] == "time"){
+	// 	Device test;
+	// 	test.getTime();
+	// //}
+
+	// return 0;
 }
+
+// 	Device test;
+// 	test.setTime(0,0,0);		//setTime takes args [Hrs, Mins, Secs]
+// //	test.getTemp();
+// //	test.setAlarm1();			//testing alarm values with masks (1) in AM1 - A1M3 and 0 in A1M4 to trigger on seconds match
+// //	test.alarmTest();
+// //	test.sqTest();				//sqTest sets RS1 & RS2 bits to 1 - setting frequency to 1Hz (once per second!) (use enums as args to make better)
+// //	test.setAlarm1();
+// 	test.setAlarm(1);
+// 	sleep(20);
+// 	test.setAlarm(2);
+//return 0;	
+//}
