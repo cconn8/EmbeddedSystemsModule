@@ -50,7 +50,6 @@ public:
 	virtual int setTime(int hours, int mins, int secs);
 	virtual int setDate(int Day, int Date, int Month, int Year);
 	virtual int getTemp();
-	virtual int setAlarm1();
 	virtual int sqTest();
 	virtual int readFullBuffer();
 	virtual int send(char const* buffer); 			//wraps i2c check/write method to be used throughout

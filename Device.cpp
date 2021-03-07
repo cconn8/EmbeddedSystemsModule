@@ -235,41 +235,6 @@ int Device::getTemp(){
 
 }
 
-
-int Device::setAlarm1(){
-
-	openBus();	
-    //snprintf(this->buffer, sizeof(this->buffer), "/dev/i2c-1");
-
-	setSlave(DS3231_ADDR); //open communication with sensor at address 0x68	
-
-	//Set INTCN and A1IE bits to logic one in the control register
-	//ensures alarm flags are flushed to 0 in control status register
-	setAlmCtrlBits(1);			
-
-	//set alarm clock for 12:30:10 with all 0's in bit 7 (A1Mx bits) and 1 in DY/DT bit
-	//to trigger alarm when day, hours and minutes match
-	char writeBuffer[5];
-	writeBuffer[0] = 0x07; 		//sets pointer to first alarm register @ 0x07 
-	writeBuffer[1] = 0x86; 		//A1 secs
-	writeBuffer[2] = 0x80; 		//A1 mins
-	writeBuffer[3] = 0x80; 		//A1 hours (
-	writeBuffer[4] = 0x41; 		//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
-
-	send(writeBuffer);			//writes the writeBuffer to the device using i2c write method
-	cout<<"Alarm set!"<<endl;
-	
-	reset();					//Reset pointer to 0x00 in between read/writes
-	readFullBuffer();  			//read all registers from device to memory
-
-	//Shift Day bits right 6 
-	cout<<"Alarm set for -  Day " << bcdToDec((this->buffer[10]>>6)) << " at " << bcdToDec(this->buffer[9]) << " : " << bcdToDec(this->buffer[8]) << " : " << bcdToDec(this->buffer[7]) <<  endl;
-
-	getTime();
-	close(file);
-	return 0;
-}
-
 int Device::setAlarm(int alarm){
 
 	openBus();
@@ -281,28 +246,40 @@ int Device::setAlarm(int alarm){
 		//Set INTCN and A1IE bits to logic one in the control register
 		//ensure alarm flags are flushed to 0 in control status register
 		setAlmCtrlBits(1);		//takes alarm number as argument
+		reset();
 		char writeBuffer[5];		
-		writeBuffer[0] = ALM1_SEC_ADDR;				//sets pointer to first alarm reg 0x07
-		writeBuffer[1] = shiftXOR(decToBcd(10), 7); 		//A1 secs - shift 1 << 
-		writeBuffer[2] = shiftXOR(decToBcd(30), 7); 	 	//A1 mins
-		writeBuffer[3] = shiftXOR(decToBcd(12), 7); 	 	//A1 hours (
-		writeBuffer[4] = shiftXOR(decToBcd(12), 7); 		//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
+		writeBuffer[0] = ALM1_SEC_ADDR;		//sets pointer to first alarm reg 0x07
+		writeBuffer[1] = decToBcd(10); 		//A1 secs 
+		writeBuffer[2] = decToBcd(30);	 	//A1 mins
+		writeBuffer[3] = decToBcd(12); 	 	//A1 hours
+		writeBuffer[4] = decToBcd(1); 		//A1 day 
 
-		for(int i=0; i<10; i++){							//For loop to test alarm per second by flushing flag reg eery second
-			send(writeBuffer);								//successful - alarm retriggers flag every second
-			cout<<"Alarm 1 set!"<<endl;
+		send(writeBuffer);					//writes the writeBuffer to the device using i2c write method
+		reset();							//Reset pointer to 0x00 in between read/writes
+		readFullBuffer();  					//read all registers from device to memory
+
+		//Shift Day bits right 6 
+		cout<<"Alarm 1 set for -  Day " << bcdToDec((this->buffer[10]>>6)) << " at " << bcdToDec(this->buffer[9]) << " : " << 
+		bcdToDec(this->buffer[8]) << " : " << bcdToDec(this->buffer[7]) <<  endl;
+		
+
+		for(int i=0; i<10; i++){
+			cout<<"Alarm!"<<endl;
 			sleep(1);
-			flushAlmFlags();									//bring alarm flag back to zero for next match
+			flushAlmFlags();					//bring alarm flag back to zero for next match
+			sleep(1);
+		
 		}
 
-		close(file);
+	close(file);
 
-	}else if(alarm == 2){
+	} else if(alarm == 2){
 
 		//SET ALARM FOR ONCE PER MINUTE -ALARM MASKS [1,1,0] - USING shiftXOR to set DY/DT to 1 for Date
 		//Set INTCN and A2IE bits to logic one in the control register
 		//ensure alarm flags are flushed to 0 in control status register
 		setAlmCtrlBits(2);							//takes alarm number as argument
+		reset();
 		char writeBuffer[4];	
 		writeBuffer[0] = ALM2_MIN_ADDR;				//sets pointer to first alarm reg 0x07
 		writeBuffer[1] = decToBcd(31); 				//mins
@@ -310,8 +287,14 @@ int Device::setAlarm(int alarm){
 		writeBuffer[3] = shiftXOR(decToBcd(15), 6); //A1 Date mode enabled by shifting 1 << 6 positions and ^ for high DY/DT
 		writeBuffer[4] = 0x41; 						//A1 day - 4 (0100) sets DY/DT to 1 making alarm trigger by day)
 
-		send(writeBuffer);
-		cout<<"Alarm 2 set!"<<endl;
+		send(writeBuffer);							//writes the writeBuffer to the device using i2c write method
+		reset();									//Reset pointer to 0x00 in between read/writes
+		readFullBuffer();  							//read all registers from device to memory
+
+		//Shift Day bits right 6 
+		cout<<"Alarm 2 set for -  Day " << bcdToDec((this->buffer[13]>>6)) << " at " << bcdToDec(this->buffer[12]) << " hrs : " << 
+		bcdToDec(this->buffer[11]) << " mins " << endl;
+		
 		flushAlmFlags();							//bring alarm flag back to zero for next match
 		close(file);
 	}
@@ -328,14 +311,14 @@ int Device::alarmTest(){  							//triggers alarm once per second
 	//Set INTCN and A1IE bits to logic one in the control register
 	//ensure alarm flags are flushed to 0 in control status register
 	setAlmCtrlBits(1);						//takes alarm number as argument
-
+	reset();
 
 		char writeBuffer[5];
 		writeBuffer[0] = 0x07; 				//sets pointer to first alarm register @ 0x07 
-		writeBuffer[1] = decToBcd(80); 		//A1 secs - Hex 66 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
-		writeBuffer[2] = decToBcd(80); 		//A1 mins - this triggers an alarm per second
-		writeBuffer[3] = decToBcd(80);  	//A1 hours 
-		writeBuffer[4] = 0x81;  			//A1 day 
+		writeBuffer[1] = decToBcd(86); 		//A1 secs - Hex 66 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
+		writeBuffer[2] = decToBcd(86); 		//A1 mins - this triggers an alarm per second
+		writeBuffer[3] = decToBcd(86);  		//A1 hours 
+		writeBuffer[4] = decToBcd(86);  		//A1 day 
 
 		send(writeBuffer);
 		
@@ -353,9 +336,7 @@ int Device::alarmTest(){  							//triggers alarm once per second
 int Device::sqTest(){
 
 	openBus();
-
 	cout<<"Testing square wave"<<endl;
-	snprintf(this->buffer, sizeof(this->buffer), "/dev/i2c-1");
 
 	setSlave(DS3231_ADDR); 				//open communication with sensor at address 0x68				
 	reset(); 							//set first register in write mode to start
@@ -376,8 +357,7 @@ int Device::sqTest(){
 
 
 	cout<<"successful write to device"<<endl;	
-	//close(this->file);
-	//cout<<"- Bus Closed! -\n"<<endl;
+	close(this->file);
 	return 0;
 
 
@@ -389,23 +369,74 @@ Device::~Device(){
 int main(int argc, char* args[]){
 
 	string arg;
+	int option;
 	Device test;
 	
 	if(argc == 2){
 		arg = args[1];
+
 		if(arg == "Time" || arg == "time"){
-			test.getTime();
+			cout<<"1. Get Time/Date\n2. Set Time/Date\nEnter: ";
+			cin>>option;
 
-		} else if(arg == "Temperature" || arg == "temperature" || arg == "Temp" || arg == "temp"){
+			if(option == 1){
+				test.getTime();
+			}
+			else if(option == 2){
+				test.setTime(12, 30, 30);					//Time takes hrs, minutes, seconds
+				test.setDate(5, 20, 5, 21);					//Date is day, date, month, year		
+			}
+			else if(option > 2){ 
+				cout<<"Invalid entry"<<endl;
+				return 1;
+			}
+			return 0;
+		} 
+		
+		if(arg == "Temperature" || arg == "temperature" || arg == "Temp" || arg == "temp"){
 			test.getTemp();
+			return 0;
+		} 
 
+
+		if(arg == "Alarm" || arg == "alarm"){
+			cout<<"1. Set Alarm 1\n2. Set Alarm 2\nEnter: ";
+			cin>>option;
+
+			if(option == 1){
+				test.setAlarm(1);
+			}
+			else if(option == 2){
+				test.setAlarm(2);				
+			}
+			else if(option > 2){ 
+				cout<<"Invalid entry"<<endl;
+				return 1;
+			}
+			return 0;
+		} 
+		
+		if(arg == "Test" || "test") {
+			cout<<"1. Square Wave Test \n2. Alarm Interrupt Test \nEnter: ";
+			cin>>option;
+
+			if(option == 1) {
+				test.sqTest();
+			}
+			else if(option == 2){
+				test.alarmTest();
+			}
+			else if(option > 2){ 
+				cout<<"Invalid entry"<<endl;
+				return 1;
+			}
+			return 0;
 		}
-
-		return 0;
 	} 
-	else cout<<"Invalid argument(s)"<<endl;
+	else cout<<"Invalid argument(s) \nArguments are 1. [Time] 2. [Temp], 3. [Alarm] 4. [Test]"<<endl;
 	return 1;
 
+}
 
 	// //if(args[0] == "Time" || args[0] == "time"){
 	// 	Device test;
@@ -413,15 +444,14 @@ int main(int argc, char* args[]){
 	// //}
 
 	// return 0;
-}
 
 // 	Device test;
 // 	test.setTime(0,0,0);		//setTime takes args [Hrs, Mins, Secs]
-// //	test.getTemp();
-// //	test.setAlarm1();			//testing alarm values with masks (1) in AM1 - A1M3 and 0 in A1M4 to trigger on seconds match
-// //	test.alarmTest();
-// //	test.sqTest();				//sqTest sets RS1 & RS2 bits to 1 - setting frequency to 1Hz (once per second!) (use enums as args to make better)
-// //	test.setAlarm1();
+//	test.getTemp();
+//	test.setAlarm1();			//testing alarm values with masks (1) in AM1 - A1M3 and 0 in A1M4 to trigger on seconds match
+//	test.alarmTest();
+//	test.sqTest();				//sqTest sets RS1 & RS2 bits to 1 - setting frequency to 1Hz (once per second!) (use enums as args to make better)
+//	test.setAlarm1();
 // 	test.setAlarm(1);
 // 	sleep(20);
 // 	test.setAlarm(2);
