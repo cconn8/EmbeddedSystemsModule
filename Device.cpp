@@ -74,7 +74,7 @@ int Device::setAlmCtrlBits( int alarm){
 		char setCtrl[3];
 		setCtrl[0] = 0x0E;  					//sets pointer to control register address - values follow
 		if(alarm == 1){ setCtrl[1] = 0x1D; }  	//00011101 sets control reg to all zeros except rs1,rs2, INTCN & A1IE (alarm 1)
-			else { setCtrl[1] = 0x06; } 			//00000110 sets control reg to all zeros except INTCN & A2IE (alarm 2)
+			else { setCtrl[1] = 0x06; } 		//00000110 sets control reg to all zeros except INTCN & A2IE (alarm 2)
 		setCtrl[2] = 0x88; 						//10001000 clears the alarm flag bits to zero (A1F set to 1 on match)
 		
 		if(write(this->file, setCtrl, 2) != 2){
@@ -126,8 +126,9 @@ int Device::send(char const* buffer){
 	}
 	return 0;
 }
-													//Used for setting higher bits (6,7,8) in certain registers i.e. Aalrm masks
-													//without impacting the alarm times
+
+//Used for setting higher bits (6,7,8) in certain registers i.e. Aalrm masks
+//without impacting the alarm times
 int Device::shiftXOR(int val, int shift){			//takes a value as input and shifts to leeft
 	char temp = 0x01;
 	val = val ^ (temp<<shift);						//shifts left by shift values
@@ -149,7 +150,8 @@ int Device::getTime(){
 
 	//cout<<"Date is  WeekDay - Date  Year " <<endl;
 	cout<<"The RTC date is: "<< endl;
-	cout<<"Day : " << bcdToDec(this->buffer[3]) << "\nDate : " << bcdToDec(this->buffer[4]) << "\nMonth : " << bcdToDec(this->buffer[5]) << "\nYear : " << bcdToDec(this->buffer[6]) << endl;
+	cout<<"Day : " << bcdToDec(this->buffer[3]) << "\nDate : " << bcdToDec(this->buffer[4]) << 
+	"\nMonth : " << bcdToDec(this->buffer[5]) << "\nYear : " << bcdToDec(this->buffer[6]) << endl;
 
 	close(this->file);
 	return 0;
@@ -179,7 +181,8 @@ int Device::setTime(int hours, int mins, int secs){
 	reset(); 							//reset in pointer to first register in between read/writes	
 	readFullBuffer();					//Read in all registers to memory
 
-	cout<< "\nTime set [Hrs : Mins : Secs]\n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
+	cout<< "\nTime set [Hrs : Mins : Secs]\n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << 
+	bcdToDec(this->buffer[0]) << endl;
 
 	close(this->file);
 	return 0;
@@ -209,7 +212,9 @@ int Device::setDate(int day, int date, int month, int year){
 	reset(); 								//reset in pointer to first register in between read/writes	
 	readFullBuffer();   					//Reads 19 registers to memory to be pulled from 
 
-	cout << "Time set \nWeekday : "<< bcdToDec(this->buffer[5]) <<"\nDate : "<< bcdToDec(this->buffer[6]) << "\nMonth : "<< bcdToDec(this->buffer[7]) << "\n\nTime in Hrs : Mins : Secs \n"<< bcdToDec(this->buffer[2]) << " : " << bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
+	cout << "Time set \nWeekday : "<< bcdToDec(this->buffer[5]) <<"\nDate : "<< bcdToDec(this->buffer[6]) << 
+		"\nMonth : "<< bcdToDec(this->buffer[7]) << "\n\nTime in Hrs : Mins : Secs \n"<< bcdToDec(this->buffer[2]) << " : " << 
+		bcdToDec(this->buffer[1]) << " : " << bcdToDec(this->buffer[0]) << endl;
 
 	close(this->file);
 	return 0;
@@ -237,6 +242,8 @@ int Device::getTemp(){
 
 int Device::setAlarm(int alarm){
 
+
+	snprintf(this->buffer, sizeof(this->buffer), "/dev/i2c-1");
 	openBus();
 	setSlave(DS3231_ADDR);
 
@@ -280,7 +287,7 @@ int Device::setAlarm(int alarm){
 		//ensure alarm flags are flushed to 0 in control status register
 		setAlmCtrlBits(2);							//takes alarm number as argument
 		reset();
-		char writeBuffer[4];	
+		char writeBuffer[5];	
 		writeBuffer[0] = ALM2_MIN_ADDR;				//sets pointer to first alarm reg 0x07
 		writeBuffer[1] = decToBcd(31); 				//mins
 		writeBuffer[2] = decToBcd(12); 				//A1 mins
@@ -312,22 +319,24 @@ int Device::alarmTest(){  							//triggers alarm once per second
 	//ensure alarm flags are flushed to 0 in control status register
 	setAlmCtrlBits(1);						//takes alarm number as argument
 	reset();
+	readFullBuffer();
 
-		char writeBuffer[5];
-		writeBuffer[0] = 0x07; 				//sets pointer to first alarm register @ 0x07 
-		writeBuffer[1] = decToBcd(86); 		//A1 secs - Hex 66 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
-		writeBuffer[2] = decToBcd(86); 		//A1 mins - this triggers an alarm per second
-		writeBuffer[3] = decToBcd(86);  		//A1 hours 
-		writeBuffer[4] = decToBcd(86);  		//A1 day 
+	char writeBuffer[5];
+	writeBuffer[0] = 0x07; 				//sets pointer to first alarm register @ 0x07 
+	writeBuffer[1] = decToBcd(86); 		//A1 secs - Hex 86 sets 1000 0010 sending 1 to Alarm mask bit in each alarm
+	writeBuffer[2] = decToBcd(86); 		//A1 mins - this triggers an alarm per second
+	writeBuffer[3] = decToBcd(86);  		//A1 hours 
+	writeBuffer[4] = 0x86;  		//A1 day 
 
-		send(writeBuffer);
-		
-		for(int i=0; i<10; i++){			//Tests alarm every second by flushing the flag to see does it trigger
-			cout<<"ALARM!"<<endl;
-			sleep(1);
-			flushAlmFlags();				//returns AF1 and AF2 back to zero LED should come back on seeing as INTCN is high
-			sleep(1);						//Once a flag goes high it stays high until flushed again so this is required
-		}
+	send(writeBuffer);
+	reset();
+	
+	for(int i=0; i<10; i++){			//Tests alarm every second by flushing the flag to see does it trigger
+		cout<<"ALARM!"<<endl;
+		sleep(1);
+		flushAlmFlags();				//returns AF1 and AF2 back to zero LED should come back on seeing as INTCN is high
+		sleep(1);						//Once a flag goes high it stays high until flushed again so this is required
+	}
 
 	return 0;
 }
@@ -344,19 +353,21 @@ int Device::sqTest(){
 	reset();							//reset pointer to 0x00 in between read/writes
 	readFullBuffer();  					//read all registers from device to memory
 
-	reset();
 	char ctrl = this->buffer[0x0E];		//initial - 0001 1100
 	ctrl = ctrl ^ (0x07 << 3);  		//shifts 111 3 to the left and XORs to make btts 3,4,5 [0s]
 
 	char sendBits[2];
 	sendBits[0] = 0x0E;  				//point to control register at 0x0e
-	sendBits[1] = ctrl;  				//send XOR'd vaues
+	sendBits[1] = 0x00;  				
 
 	send(sendBits);						//uses i2c write() to check and send the "sendBits" data
 	//setCtrlReg();  					//reset control register original values
 
 
 	cout<<"successful write to device"<<endl;	
+
+	sleep(10);
+	setCtrlReg();						//turn back on LED
 	close(this->file);
 	return 0;
 
@@ -379,14 +390,12 @@ int main(int argc, char* args[]){
 			cout<<"1. Get Time/Date\n2. Set Time/Date\nEnter: ";
 			cin>>option;
 
-			if(option == 1){
-				test.getTime();
-			}
+			if(option == 1){ test.getTime(); }
 			else if(option == 2){
 				test.setTime(12, 30, 30);					//Time takes hrs, minutes, seconds
 				test.setDate(5, 20, 5, 21);					//Date is day, date, month, year		
 			}
-			else if(option > 2){ 
+			else if(option > 2){ 							//Error check
 				cout<<"Invalid entry"<<endl;
 				return 1;
 			}
@@ -397,19 +406,13 @@ int main(int argc, char* args[]){
 			test.getTemp();
 			return 0;
 		} 
-
-
 		if(arg == "Alarm" || arg == "alarm"){
 			cout<<"1. Set Alarm 1\n2. Set Alarm 2\nEnter: ";
 			cin>>option;
 
-			if(option == 1){
-				test.setAlarm(1);
-			}
-			else if(option == 2){
-				test.setAlarm(2);				
-			}
-			else if(option > 2){ 
+			if(option == 1){test.setAlarm(1);}
+			else if(option == 2){test.setAlarm(2);}
+			else if(option > 2){ 							//Error check
 				cout<<"Invalid entry"<<endl;
 				return 1;
 			}
@@ -420,13 +423,9 @@ int main(int argc, char* args[]){
 			cout<<"1. Square Wave Test \n2. Alarm Interrupt Test \nEnter: ";
 			cin>>option;
 
-			if(option == 1) {
-				test.sqTest();
-			}
-			else if(option == 2){
-				test.alarmTest();
-			}
-			else if(option > 2){ 
+			if(option == 1) { test.sqTest();}
+			else if(option == 2){test.alarmTest();}
+			else if(option > 2){ 							//Error check
 				cout<<"Invalid entry"<<endl;
 				return 1;
 			}
